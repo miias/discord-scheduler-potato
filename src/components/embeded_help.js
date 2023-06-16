@@ -13,7 +13,7 @@ function getEmbededHelp(){
       { name: 'COMMANDS : ', value: '\u200B' },
       { name: '!help', value: 'to get this message' },
       { name: '!setchannel <channel>', value: '!setchannel #general \nUse this Command to instruct the bot on where to post schedule messages.' },
-      { name: '!schedule <Title>;<YYYY/MM/DD HH:MM am/pm>;<Description>', value: '!schedule Some Title;2023/6/15 12:00 am;some long desc......' },
+      { name: '!schedule <Title>;<YYYY/MM/DD HH:MM am/pm gmt>;<Description>', value: '!schedule Some Title;2023/6/15 12:00 am gmt+3;some long desc......' },
       { name: '!endevent <EventID>', value: '!endevent 1119013140563251220' },
       { name: '\u200B', value: '\u200B' },
 

@@ -72,8 +72,7 @@ client.on('guildCreate', (guild) => {
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
   if (!message.content.startsWith(prefix)) return;
-  if (message.guild && !processedMessages.has(message.id)) {
-    processedMessages.add(message.id);
+  if (message.guild ) {
 
     const args = message.content.slice(prefix.length).trim().split(/ +/g);
     const command = args.shift().toLowerCase();
@@ -153,92 +152,8 @@ async function processMessage(passedEventMessage, message, embedObj, update, tit
           dueDate: new Date(date)
         }, true);
 
-        const filter = (interaction) => true;
-
-        const collector = msg.createMessageComponentCollector({ filter });
-
-
-
-        collector.on('collect', async (interaction) => {
-          if (interaction.isButton()) {
-
-            const user = interaction.user;
-            const btn_id = interaction.customId;
-            await dbOp(User, { id: user.id }, { id: user.id, name: user.username });
-
-            await await UserMessage
-              .findOne({ where: { id: user.id + message.id } })
-              .then(async function(foundItem) {
-                if (!foundItem) {
-                  // Item not found, create a new one
-                  return await UserMessage
-                    .create({ id: user.id + message.id, userId: user.id, messageId: eventMessage.id, playerStatus: btn_id })
-                    .then(function(item) { return item; });
-                } else if (foundItem.playerStatus == btn_id) {
-                  return await UserMessage
-                    .destroy({ where: { id: user.id + message.id } });
-                } else {
-                  return await UserMessage
-                    .update({ userId: user.id, messageId: eventMessage.id, playerStatus: btn_id },
-                      { where: { id: user.id + message.id } })
-                    .then(function(item) { return item; });
-                }
-                // Found an item, update it
-
-              });
-
-            var clickedUsers = await User.findAll({
-              include: [
-                {
-                  model: UserMessage,
-                  where: { messageId: eventMessage.id },
-                  attributes: ['playerStatus']
-                },
-              ],
-            });
-
-            const tanks = clickedUsers.
-              filter((u) => u.userMessages[0].playerStatus == Status.TANK).
-              map((u) => `<@${u.id}>`.toString());
-
-            const dpss = clickedUsers.
-              filter((u) => u.userMessages[0].playerStatus == Status.DPS).
-              map((u) => `<@${u.id}>`.toString());
-
-            const healers = clickedUsers.
-              filter((u) => u.userMessages[0].playerStatus == Status.HEALER).
-              map((u) => `<@${u.id}>`.toString());
-
-            const anys = clickedUsers.
-              filter((u) => u.userMessages[0].playerStatus == Status.ANY).
-              map((u) => `<@${u.id}>`.toString());
-
-            const absances = clickedUsers.
-              filter((u) => u.userMessages[0].playerStatus == Status.ABSANCE).
-              map((u) => `<@${u.id}>`.toString());
-
-
-
-            const embed = embeddedMessage(
-              eventMessage.id,
-              eventMessage.title,
-              eventMessage.desc,
-              eventMessage.autherName,
-              eventMessage.dueDate,
-              EventStatus.RECRUITING,
-              tanks,
-              dpss,
-              healers,
-              anys,
-              absances
-            );
-            interaction.deferUpdate();
-
-            processMessage(eventMessage, msg, { embeds: [embed], components: [row, row2] }, true);
-            console.log(`User ${user.tag} clicked the button.`);
-            // Do something with the user who clicked the button
-          }
-        });
+        await setupListeners(msg,eventMessage);
+        
         const newEmbed = embeddedMessage(
           eventMessage.id,
           eventMessage.title,
@@ -279,15 +194,109 @@ async function checkForPosts() {
   try {
     var messages = await Message.findAll({ where: { eventStatus: EventStatus.RECRUITING } });
     messages.forEach(async (msg) => {
-      if (Date.now() > msg.dueDate) {
+      if (Date.now() >= msg.dueDate) {
         await endEvent(msg, true);
+      }else if(!processedMessages.has(msg.id)){
+        await client.channels.fetch(msg.channelId)
+        .then(async channel  => await channel.messages.fetch(msg.id))
+        .then(async message => {
+          await setupListeners(message,msg);
+        });
       }
     });
   } catch (e) {
     console.log('An error occurred:', e.message);
   }
-  processedMessages.clear();
   setTimeout(checkForPosts, 30000);
+}
+
+async function setupListeners(msg,eventMessage){
+    processedMessages.add(msg.id);
+    const filter = (interaction) => true;
+
+    const collector = msg.createMessageComponentCollector({ filter });
+
+
+
+    collector.on('collect', async (interaction) => {
+      if (interaction.isButton()) {
+
+        const user = interaction.user;
+        const btn_id = interaction.customId;
+        await dbOp(User, { id: user.id }, { id: user.id, name: user.username });
+
+        await await UserMessage
+          .findOne({ where: { id: user.id + eventMessage.id } })
+          .then(async function(foundItem) {
+            if (!foundItem) {
+              // Item not found, create a new one
+              return await UserMessage
+                .create({ id: user.id + eventMessage.id, userId: user.id, messageId: eventMessage.id, playerStatus: btn_id })
+                .then(function(item) { return item; });
+            } else if (foundItem.playerStatus == btn_id) {
+              return await UserMessage
+                .destroy({ where: { id: user.id + eventMessage.id } });
+            } else {
+              return await UserMessage
+                .update({ userId: user.id, messageId: eventMessage.id, playerStatus: btn_id },
+                  { where: { id: user.id + eventMessage.id } })
+                .then(function(item) { return item; });
+            }
+
+          });
+
+        var clickedUsers = await User.findAll({
+          include: [
+            {
+              model: UserMessage,
+              where: { messageId: eventMessage.id },
+              attributes: ['playerStatus']
+            },
+          ],
+        });
+
+        const tanks = clickedUsers.
+          filter((u) => u.userMessages[0].playerStatus == Status.TANK).
+          map((u) => `<@${u.id}>`.toString());
+
+        const dpss = clickedUsers.
+          filter((u) => u.userMessages[0].playerStatus == Status.DPS).
+          map((u) => `<@${u.id}>`.toString());
+
+        const healers = clickedUsers.
+          filter((u) => u.userMessages[0].playerStatus == Status.HEALER).
+          map((u) => `<@${u.id}>`.toString());
+
+        const anys = clickedUsers.
+          filter((u) => u.userMessages[0].playerStatus == Status.ANY).
+          map((u) => `<@${u.id}>`.toString());
+
+        const absances = clickedUsers.
+          filter((u) => u.userMessages[0].playerStatus == Status.ABSANCE).
+          map((u) => `<@${u.id}>`.toString());
+
+
+
+        const embed = embeddedMessage(
+          eventMessage.id,
+          eventMessage.title,
+          eventMessage.desc,
+          eventMessage.autherName,
+          eventMessage.dueDate,
+          EventStatus.RECRUITING,
+          tanks,
+          dpss,
+          healers,
+          anys,
+          absances
+        );
+        interaction.deferUpdate();
+
+        processMessage(eventMessage, msg, { embeds: [embed], components: [row, row2] }, true);
+        console.log(`User ${user.tag} clicked the button.`);
+        // Do something with the user who clicked the button
+      }
+    });
 }
 
 async function endEvent(msg, showMentions) {
@@ -355,8 +364,7 @@ async function endEvent(msg, showMentions) {
         msg.id,
         msg.title,
         msg.autherName,
-        clickedUsers.
-          map((u) => `<@${u.id}>`.toString())
+        [...tanks, ...dpss, ...healers,...anys]
       );
       if (showMentions)
       await message.channel.send({ embeds: [eMent], components: [] });
