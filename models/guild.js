@@ -6,7 +6,11 @@ const Guild = sequelize.define('guild',{
     id:{
         type:Sequelize.STRING,
         primaryKey:true
-    }
+    },
+    eventChannelId:{
+        type:Sequelize.STRING,
+        allowNull:true
+    },
 });
 
 Guild.hasMany(User);
