@@ -3,7 +3,8 @@ const Status = {
     DPS: 'DPS',
     HEALER: 'HEALER',
     ANY: 'ANY',
-    ABSANCE: 'ABSANCE'
+    ABSANCE: 'ABSANCE',
+    BENCH: 'BENCH',
   };
 
 const EventStatus = {

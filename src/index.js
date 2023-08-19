@@ -1,11 +1,4 @@
-
-const express = require('express');
-const app = express();
-const port = 3000;
-
-app.get('/', (req, res) => res.send('Hello World!'));
-
-app.listen(port, () => console.log(`Example app listening at http://localhost:${port}`));
+const keepAlive = require(`./server`);
 
 const {
   Client,
@@ -77,7 +70,10 @@ client.on('messageCreate', async (message) => {
     const args = message.content.slice(prefix.length).trim().split(/ +/g);
     const command = args.shift().toLowerCase();
     const eventDetails = args.join(' ');
-    if (command === 'setchannel') {
+
+    if (command === 'test') {
+
+    } else if (command === 'setchannel') {
       const newChannelId = eventDetails.replace(/[<>#]/g, '');
       dbOp(Guild, { id: message.guild.id }, { id: message.guild.id, eventChannelId: newChannelId });
       message.reply("Schedules will now be sent to " + `<#${newChannelId}>`);
@@ -119,6 +115,7 @@ client.on('messageCreate', async (message) => {
                 '',
                 '',
                 EventStatus.RECRUITING,
+                [],
                 [],
                 [],
                 [],
@@ -165,6 +162,7 @@ async function processMessage(passedEventMessage, message, embedObj, update, tit
           [],
           [],
           [],
+          [],
           []
         );
 
@@ -185,7 +183,10 @@ async function processMessage(passedEventMessage, message, embedObj, update, tit
     } else {
       var guild = await Guild.findOne({ where: { id: message.guild.id } });
       client.channels.fetch(guild.eventChannelId == null ? message.channelId : guild.eventChannelId)
-        .then(channel => { channel.send(embedObj).then(m); }).catch((e) => {
+        .then(channel => {
+          channel.send("@everyone");
+          channel.send(embedObj).then(m);
+        }).catch((e) => {
           console.log('guild not found');
         });;;
     }
@@ -233,9 +234,10 @@ async function setupListeners(msg, eventMessage) {
 
       const user = interaction.user;
       const btn_id = interaction.customId;
+      //console.log(interaction.member);
       await dbOp(User, { id: user.id }, { id: user.id, name: user.username });
 
-      await await UserMessage
+      await UserMessage
         .findOne({ where: { id: user.id + eventMessage.id } })
         .then(async function(foundItem) {
           if (!foundItem) {
@@ -267,23 +269,27 @@ async function setupListeners(msg, eventMessage) {
 
       const tanks = clickedUsers.
         filter((u) => u.userMessages[0].playerStatus == Status.TANK).
-        map((u) => `<@${u.id}>`.toString());
+        map((u) => `<@${u.id}> ${u.name}`.toString());
 
       const dpss = clickedUsers.
         filter((u) => u.userMessages[0].playerStatus == Status.DPS).
-        map((u) => `<@${u.id}>`.toString());
+        map((u) => `<@${u.id}> ${u.name}`.toString());
 
       const healers = clickedUsers.
         filter((u) => u.userMessages[0].playerStatus == Status.HEALER).
-        map((u) => `<@${u.id}>`.toString());
+        map((u) => `<@${u.id}> ${u.name}`.toString());
 
       const anys = clickedUsers.
         filter((u) => u.userMessages[0].playerStatus == Status.ANY).
-        map((u) => `<@${u.id}>`.toString());
+        map((u) => `<@${u.id}> ${u.name}`.toString());
+
+      const benches = clickedUsers.
+        filter((u) => u.userMessages[0].playerStatus == Status.BENCH).
+        map((u) => `<@${u.id}> ${u.name}`.toString());
 
       const absances = clickedUsers.
         filter((u) => u.userMessages[0].playerStatus == Status.ABSANCE).
-        map((u) => `<@${u.id}>`.toString());
+        map((u) => `<@${u.id}> ${u.name}`.toString());
 
 
 
@@ -298,6 +304,7 @@ async function setupListeners(msg, eventMessage) {
         dpss,
         healers,
         anys,
+        benches,
         absances
       );
       interaction.deferUpdate();
@@ -332,23 +339,27 @@ async function endEvent(msg, showMentions) {
 
   const tanks = clickedUsers.
     filter((u) => u.userMessages[0].playerStatus == Status.TANK).
-    map((u) => `<@${u.id}>`.toString());
+    map((u) => `<@${u.id}> ${u.name}`.toString());
 
   const dpss = clickedUsers.
     filter((u) => u.userMessages[0].playerStatus == Status.DPS).
-    map((u) => `<@${u.id}>`.toString());
+    map((u) => `<@${u.id}> ${u.name}`.toString());
 
   const healers = clickedUsers.
     filter((u) => u.userMessages[0].playerStatus == Status.HEALER).
-    map((u) => `<@${u.id}>`.toString());
+    map((u) => `<@${u.id}> ${u.name}`.toString());
 
   const anys = clickedUsers.
     filter((u) => u.userMessages[0].playerStatus == Status.ANY).
-    map((u) => `<@${u.id}>`.toString());
+    map((u) => `<@${u.id}> ${u.name}`.toString());
+
+  const benches = clickedUsers.
+    filter((u) => u.userMessages[0].playerStatus == Status.BENCH).
+    map((u) => `<@${u.id}> ${u.name}`.toString());
 
   const absances = clickedUsers.
     filter((u) => u.userMessages[0].playerStatus == Status.ABSANCE).
-    map((u) => `<@${u.id}>`.toString());
+    map((u) => `<@${u.id}> ${u.name}`.toString());
 
 
 
@@ -363,6 +374,7 @@ async function endEvent(msg, showMentions) {
     dpss,
     healers,
     anys,
+    benches,
     absances
   );
 
@@ -371,20 +383,28 @@ async function endEvent(msg, showMentions) {
     .then(async message => {
       await message.edit({ embeds: [embed], components: [] }).catch((e) => {
         console.log('message not found');
-      });;;
+      });
       var eMent = embeddedMention(
         msg.id,
         msg.title,
         msg.autherName,
         [...tanks, ...dpss, ...healers, ...anys]
       );
-      if (showMentions)
-        await message.channel.send({ embeds: [eMent], components: [] }).catch((e) => {
-          console.log('message not found');
-        });;;
+      if (showMentions) {
+        if (tanks.length == 0 && dpss == 0 && healers == 0 && anys == 0) {
+        } else {
+          await message.channel.send("TANK : " + [...tanks].join(' , ').toString() + "\n" + "HEALER : " + [...healers].join(' , ').toString() + "\n" + "DPS : " + [...dpss].join(' , ').toString() + "\n" + "ANY : " + [...anys].join(' , ').toString() + "\n" + "BENCH : " + [...benches].join(' , ').toString() + "\n").catch((e) => {
+            console.log('message not found');
+          });
+          await message.channel.send({ embeds: [eMent], components: [] }).catch((e) => {
+            console.log('message not found');
+          });
+        }
+      }
     });
 }
 
 client.login(
   process.env.TOKEN
 );
+keepAlive();
